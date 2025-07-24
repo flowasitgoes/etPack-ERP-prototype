@@ -79,7 +79,7 @@ export default function ProductionTrackingForm() {
               {/* Header Section */}
               <div className="border-2 border-black">
                 <div className="text-center py-4 border-b border-black">
-                  <h1 className="text-2xl font-bold">久藝塑膠工業股份有限公司</h1>
+                  <h1 className="text-2xl font-bold">XXYY工業股份有限公司</h1>
                 </div>
 
                 <div className="border-b border-black p-4">

@@ -1,13 +1,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
-import { FileText, Package, Printer, Scissors, Clock, CheckCircle, AlertCircle, Plus, Eye, Edit } from "lucide-react"
+import { FileText, Package, Printer, Scissors, Clock, CheckCircle, AlertCircle, Plus, Eye, Edit, ArrowRight } from "lucide-react"
 import { getOrders } from "@/lib/order-storage"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd"
 
 // 部门配置
 const departments = [
@@ -30,15 +33,15 @@ const departments = [
     id: "printing",
     name: "印刷課",
     icon: Printer,
-    color: "bg-red-50 border-red-200",
-    textColor: "text-red-800",
+    color: "bg-green-50 border-green-200",
+    textColor: "text-green-800",
   },
   {
     id: "lamination",
     name: "貼合課",
-    icon: Package,
-    color: "bg-orange-50 border-orange-200",
-    textColor: "text-orange-800",
+    icon: FileText,
+    color: "bg-yellow-50 border-yellow-200",
+    textColor: "text-yellow-800",
   },
   {
     id: "slitting",
@@ -51,50 +54,60 @@ const departments = [
     id: "bag-cutting",
     name: "裁袋課",
     icon: Scissors,
-    color: "bg-yellow-50 border-yellow-200",
-    textColor: "text-yellow-800",
+    color: "bg-red-50 border-red-200",
+    textColor: "text-red-800",
   },
 ]
 
-// 表單配置
+const bagFormingFormOptions = [
+  { name: "領料單(製前領料)", type: "倉管" },
+  { name: "入庫單(料沒用完入庫)", type: "倉管" },
+  { name: "製程品質查驗表(抽袋)", type: "中文+泰文" },
+  { name: "抽袋課生產檢驗日報表", type: "" },
+  { name: "半成品標示單", type: "給下一課" },
+  { name: "訂製單記錄表(操作日期記錄)", type: "生產細節" },
+]
+
+// 表單資料
 const forms = {
   "bag-forming": [
-    { name: "領料單(製前領料)", type: "倉管", color: "red", required: true },
-    { name: "入庫單(料沒用完入庫)", type: "倉管", color: "blue", required: true },
-    { name: "製程品質查驗表(抽袋)", type: "中文+泰文", required: true },
-    { name: "抽袋課生產檢驗日報表", type: "號機", required: true },
-    { name: "半成品標示單", type: "給下一課", required: true },
-    { name: "操作日期記錄", type: "生產細節", required: true },
+    { name: "領料單(製前領料)", type: "倉管" },
+    { name: "入庫單(料沒用完入庫)", type: "倉管" },
+    { name: "製程品質查驗表(抽袋)", type: "中文+泰文" },
+    { name: "抽袋課生產檢驗日報表", type: "" },
+    { name: "半成品標示單", type: "給下一課" },
+    { name: "訂製單記錄表(操作日期記錄)", type: "生產細節" },
   ],
-  printing: [
-    { name: "領料單(製前領染料)", type: "倉管", color: "red", required: true },
-    { name: "入庫單(染料沒用完入庫)", type: "倉管", color: "blue", required: true },
-    { name: "抽袋課袋卷標示單1", type: "接收", required: true },
-    { name: "抽袋課袋卷標示單2", type: "接收", required: true },
-    { name: "領料單(製前領袋子)", type: "倉管", required: true },
-    { name: "製程品質查驗表(印刷)", type: "中文+泰文", required: true },
-    { name: "印刷課生產檢驗日報表", type: "號機", required: true },
-    { name: "半成品標示單", type: "給下一課", required: true },
-    { name: "操作日期記錄", type: "生產細節", required: true },
+  "printing": [
+    { name: "印刷工單", type: "生產管理" },
+    { name: "色彩校對表", type: "品質控制" },
+  ],
+  "lamination": [
+    { name: "貼合工單", type: "生產管理" },
+    { name: "材料使用記錄", type: "庫存管理" },
+  ],
+  "slitting": [
+    { name: "分條工單", type: "生產管理" },
+    { name: "尺寸檢驗表", type: "品質控制" },
   ],
   "bag-cutting": [
-    { name: "印刷/貼合標示單", type: "接收", required: true },
-    { name: "摺邊/分條標示單", type: "接收", required: true },
-    { name: "領料單(製前領袋)", type: "倉管", required: true },
-    { name: "裁袋課生產檢驗日報表1", type: "號機", required: true },
-    { name: "裁袋課生產檢驗日報表2", type: "號機", required: true },
-    { name: "半成品標示單1", type: "給QC", required: true },
-    { name: "半成品標示單2", type: "給QC", required: true },
-    { name: "入庫單(白色-採購)", type: "倉管", required: true },
-    { name: "入庫單(藍色-倉管)", type: "倉管", required: true },
-    { name: "操作日期記錄", type: "生產細節", required: true },
+    { name: "裁袋工單", type: "生產管理" },
+    { name: "成品檢驗表", type: "品質控制" },
   ],
 }
+
+// localStorage key
+const BAG_FORMING_LIST_KEY = "bagFormingFormsOrder"
 
 export default function DashboardPage() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
   const [activeTab, setActiveTab] = useState("dashboard")
   const [orders, setOrders] = useState<any[]>([])
+  const defaultBagFormingList = (forms as Record<string, any[]>)["bag-forming"] || []
+  const [bagFormingList, setBagFormingList] = useState<any[]>(defaultBagFormingList)
+  const [newFormNames, setNewFormNames] = useState<string[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter();
 
   // 載入訂單數據
   useEffect(() => {
@@ -105,55 +118,123 @@ export default function DashboardPage() {
     }
   }, [])
 
-  const getOrderColor = (status: string) => {
-    switch (status) {
-      case "進行中":
-        return "bg-blue-50 border-blue-200"
-      case "已完成":
-        return "bg-green-50 border-green-200"
-      case "待開始":
-        return "bg-yellow-50 border-yellow-200"
-      default:
-        return "bg-gray-50 border-gray-200"
-    }
+  // 初始化時載入 API 資料
+  useEffect(() => {
+    (async () => {
+      try {
+        const response = await fetch('/api/forms?department=bag-forming')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.orders && Array.isArray(data.orders) && data.orders.length > 0) {
+            setBagFormingList(data.orders)
+            // 只標記不是預設的為 new
+            setNewFormNames(data.orders.filter((f: any) => !defaultBagFormingList.some((df: any) => df.name === f.name)).map((f: any) => f.name))
+          } else {
+            setBagFormingList(defaultBagFormingList)
+            setNewFormNames([])
+          }
+        }
+      } catch {
+        setBagFormingList(defaultBagFormingList)
+        setNewFormNames([])
+      }
+    })()
+  }, [])
+
+  // 拖曳結束時更新順序並儲存
+  const onDragEnd = (result: any) => {
+    if (!result.destination) return
+    if (result.destination.index === result.source.index) return
+    const items = Array.from(bagFormingList)
+    const [removed] = items.splice(result.source.index, 1)
+    items.splice(result.destination.index, 0, removed)
+    setBagFormingList(items)
+    saveFormOrders(items)
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "進行中":
-        return "bg-blue-500"
-      case "已完成":
-        return "bg-green-500"
-      case "待開始":
-        return "bg-yellow-500"
-      default:
-        return "bg-gray-500"
+  // 新增表單
+  const handleAddForm = (form: any) => {
+    console.log('=== handleAddForm 被調用 ===')
+    console.log('傳入的表單:', form)
+    console.log('當前 bagFormingList:', bagFormingList)
+    console.log('當前 newFormNames:', newFormNames)
+    
+    if (bagFormingList.some(f => f.name === form.name)) {
+      console.log('❌ 表單已存在，不新增')
+      return
     }
+    
+    const newList = [form, ...bagFormingList]
+    console.log('✅ 新列表:', newList)
+    
+    setBagFormingList(newList)
+    setNewFormNames([form.name, ...newFormNames])
+    saveFormOrders(newList)
+    
+    console.log('=== handleAddForm 執行完成 ===')
   }
 
-  const getDepartmentIndex = (deptName: string) => {
-    return departments.findIndex(dept => dept.name === deptName)
+  // 恢復預設值
+  const handleResetDefault = async () => {
+    setBagFormingList(defaultBagFormingList)
+    setNewFormNames([])
+    await saveFormOrders(defaultBagFormingList)
+  }
+
+  // 儲存到 API
+  const saveFormOrders = async (orders: any[]) => {
+    console.log('=== saveFormOrders 被調用 ===')
+    console.log('要儲存的訂單:', orders)
+    
+    try {
+      const response = await fetch('/api/forms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ department: 'bag-forming', orders })
+      })
+      console.log('API 回應狀態:', response.status)
+      
+      if (response.ok) {
+        const result = await response.json()
+        console.log('API 回應內容:', result)
+      }
+      
+      localStorage.setItem('bagFormingFormsOrder', JSON.stringify(orders))
+      console.log('✅ 已儲存到 localStorage')
+    } catch (error) {
+      console.error('❌ 儲存失敗:', error)
+    }
+    
+    console.log('=== saveFormOrders 執行完成 ===')
+  }
+
+  // 計算各部門進度
+  const calculateProgress = (deptId: string) => {
+    if (!selectedOrder) return 0
+    const dept = selectedOrder.departments?.find((d: any) => d.id === deptId)
+    return dept ? dept.progress || 0 : 0
+  }
+
+  // 獲取部門狀態
+  const getDepartmentStatus = (deptId: string) => {
+    if (!selectedOrder) return "pending"
+    const dept = selectedOrder.departments?.find((d: any) => d.id === deptId)
+    if (!dept) return "pending"
+    if (dept.progress === 100) return "completed"
+    if (dept.progress > 0) return "in-progress"
+    return "pending"
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">工廠ERP系統 - 儀表板</h1>
-              <p className="text-sm text-gray-500">生產流程管理系統</p>
-            </div>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              新增訂單
-            </Button>
-          </div>
-        </div>
-      </header>
+    <div className="container mx-auto p-6">
+      <div className="max-w-7xl mx-auto">
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="text-center text-3xl font-bold">etPack ERP 儀表板</CardTitle>
+            <p className="text-center text-gray-600 mt-2">Dashboard</p>
+          </CardHeader>
+        </Card>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="dashboard">總覽</TabsTrigger>
@@ -164,88 +245,106 @@ export default function DashboardPage() {
 
           {/* 總覽頁面 */}
           <TabsContent value="dashboard" className="space-y-6">
-            {/* 統計卡片 */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">總訂單數</CardTitle>
-                  <FileText className="h-4 w-4 text-muted-foreground" />
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    總訂單數
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{orders.length}</div>
-                  <p className="text-xs text-muted-foreground">本月新增 +{orders.filter(o => o.createdDate?.includes('2025-01')).length}</p>
+                  <div className="text-3xl font-bold">{orders.length}</div>
+                  <p className="text-sm text-gray-500">執行中的訂單</p>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">進行中</CardTitle>
-                  <Clock className="h-4 w-4 text-blue-500" />
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5" />
+                    已完成
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-blue-600">{orders.filter(o => o.status === '進行中').length}</div>
-                  <p className="text-xs text-muted-foreground">各課別處理中</p>
+                  <div className="text-3xl font-bold text-green-600">
+                    {orders.filter((order: any) => 
+                      order.departments?.every((dept: any) => dept.progress === 100)
+                    ).length}
+                  </div>
+                  <p className="text-sm text-gray-500">完成率: {Math.round((orders.filter((order: any) => 
+                    order.departments?.every((dept: any) => dept.progress === 100)
+                  ).length / orders.length) * 100)}%</p>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">已完成</CardTitle>
-                  <CheckCircle className="h-4 w-4 text-green-500" />
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="w-5 h-5" />
+                    進行中
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-green-600">{orders.filter(o => o.status === '已完成').length}</div>
-                  <p className="text-xs text-muted-foreground">本月完成</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">待處理</CardTitle>
-                  <AlertCircle className="h-4 w-4 text-yellow-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-yellow-600">{orders.filter(o => o.status === '待開始').length}</div>
-                  <p className="text-xs text-muted-foreground">需要關注</p>
+                  <div className="text-3xl font-bold text-blue-600">
+                    {orders.filter((order: any) => 
+                      order.departments?.some((dept: any) => dept.progress > 0 && dept.progress < 100)
+                    ).length}
+                  </div>
+                  <p className="text-sm text-gray-500">正在處理</p>
                 </CardContent>
               </Card>
             </div>
 
-            {/* 訂單列表 */}
+            {selectedOrder && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>當前訂單進度</CardTitle>
+                  <p className="text-sm text-gray-500">訂單號: {selectedOrder.orderNumber}</p>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {departments.map((dept) => {
+                      const progress = calculateProgress(dept.id)
+                      const status = getDepartmentStatus(dept.id)
+                      
+                      return (
+                        <div key={dept.id} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">{dept.name}</span>
+                            <Badge variant={status === "completed" ? "default" : status === "in-progress" ? "secondary" : "outline"}>
+                              {status === "completed" ? "完成" : status === "in-progress" ? "進行中" : "待處理"}
+                            </Badge>
+                          </div>
+                          <Progress value={progress} className="w-full" />
+                        </div>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* 工作流程頁面 */}
+          <TabsContent value="workflow" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>進行中的訂單</CardTitle>
+                <CardTitle>生產流程圖</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {orders.map((order) => (
-                    <div
-                      key={order.id}
-                      className={`p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${getOrderColor(order.status)} ${selectedOrder?.id === order.id ? "ring-2 ring-blue-500" : ""}`}
-                      onClick={() => setSelectedOrder(order)}
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <h3 className="font-semibold text-lg">{order.id}</h3>
-                          <p className="text-sm text-gray-600">
-                            {order.customerName} - {order.productName}
-                          </p>
+                <div className="flex items-center justify-center space-x-4">
+                  {departments.map((dept, index) => (
+                    <div key={dept.id} className="flex items-center">
+                      <div className={`p-4 rounded-lg border ${dept.color} ${dept.textColor}`}>
+                        <dept.icon className="w-6 h-6" />
+                        <p className="text-sm font-medium mt-1">{dept.name}</p>
+                      </div>
+                      {index < departments.length - 1 && (
+                        <div className="mx-2 text-gray-400">
+                          <ArrowRight className="w-4 h-4" />
                         </div>
-                        <Badge className={getStatusColor(order.status)}>{order.status}</Badge>
-                      </div>
-
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium">當前課別: {order.currentDept}</span>
-                        <span className="text-sm text-gray-500">{order.lastUpdate}</span>
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>進度</span>
-                          <span>{order.progress}%</span>
-                        </div>
-                        <Progress value={order.progress} className="h-2" />
-                      </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -253,121 +352,114 @@ export default function DashboardPage() {
             </Card>
           </TabsContent>
 
-          {/* 工作流程頁面 */}
-          <TabsContent value="workflow" className="space-y-6">
-            {selectedOrder && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>生產流程圖</CardTitle>
-                  <p className="text-sm text-gray-500">訂單 {selectedOrder.id} 的流程進度</p>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between mb-6 overflow-x-auto">
-                    {departments.map((dept, index) => {
-                      const Icon = dept.icon
-                      const isActive = dept.name === selectedOrder.currentDept
-                      const deptIndex = getDepartmentIndex(dept.name)
-                      const isCompleted = selectedOrder.progress > (deptIndex * (100 / (departments.length - 1)))
-
-                      return (
-                        <div key={dept.id} className="flex items-center flex-shrink-0">
-                          <div
-                            className={`flex flex-col items-center p-4 rounded-lg border-2 ${isActive ? "ring-2 ring-blue-500" : ""} ${dept.color}`}
-                          >
-                            <Icon className={`w-8 h-8 mb-2 ${isCompleted ? "text-green-600" : dept.textColor}`} />
-                            <span className={`text-sm font-medium ${dept.textColor}`}>{dept.name}</span>
-                            {dept.required && (
-                              <Badge variant="secondary" className="mt-1 text-xs">
-                                必經
-                              </Badge>
-                            )}
-                            {isCompleted && <CheckCircle className="w-4 h-4 text-green-600 mt-1" />}
-                          </div>
-                          {index < departments.length - 1 && (
-                            <div className={`w-12 h-1 mx-2 ${isCompleted ? "bg-green-500" : "bg-gray-300"}`} />
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  {/* 當前課別詳情 */}
-                  <Card className="mt-6">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        當前課別: {selectedOrder.currentDept}
-                        <Badge variant="outline">{selectedOrder.lastUpdate}</Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <h4 className="font-medium mb-2">基本信息</h4>
-                          <div className="space-y-1 text-sm">
-                            <p>
-                              <span className="font-medium">訂單編號:</span> {selectedOrder.id}
-                            </p>
-                            <p>
-                              <span className="font-medium">客戶名稱:</span> {selectedOrder.customerName}
-                            </p>
-                            <p>
-                              <span className="font-medium">產品名稱:</span> {selectedOrder.productName}
-                            </p>
-                            <p>
-                              <span className="font-medium">開單日期:</span> {selectedOrder.createdDate}
-                            </p>
-                          </div>
-                        </div>
-                        <div>
-                          <h4 className="font-medium mb-2">操作記錄</h4>
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2 text-sm">
-                              <CheckCircle className="w-4 h-4 text-green-500" />
-                              <span>業務課開單完成 ({selectedOrder.createdDate})</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm">
-                              <Clock className="w-4 h-4 text-blue-500" />
-                              <span>{selectedOrder.currentDept}處理中 ({selectedOrder.lastUpdate})</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
           {/* 表單管理頁面 */}
           <TabsContent value="forms" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {departments.filter(dept => (forms as Record<string, any[]>)[dept.id]).map((dept) => (
                 <Card key={dept.id}>
-                  <CardHeader>
+                  <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
                       <dept.icon className="w-5 h-5" />
                       {dept.name}
                     </CardTitle>
+                    {/* 只在抽袋課顯示恢復預設值按鈕 */}
+                    {dept.id === "bag-forming" && (
+                      <Button size="sm" variant="outline" onClick={handleResetDefault}>
+                        恢復預設值
+                      </Button>
+                    )}
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {(forms as Record<string, any[]>)[dept.id]?.map((form, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <div>
-                            <p className="font-medium text-sm">{form.name}</p>
-                            <p className="text-xs text-gray-500">{form.type}</p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline">
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            <Button size="sm" variant="outline">
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                      {/* 抽袋課拖曳區域 */}
+                      {dept.id === "bag-forming" ? (
+                        <>
+                          <DragDropContext onDragEnd={onDragEnd}>
+                            <Droppable droppableId="bagFormingForms">
+                              {(provided) => (
+                                <div ref={provided.innerRef} {...provided.droppableProps}>
+                                  {bagFormingList.map((form, idx) => (
+                                    <Draggable key={`${form.name}-${idx}`} draggableId={`${form.name}-${idx}`} index={idx}>
+                                      {(provided, snapshot) => (
+                                        <div
+                                          ref={provided.innerRef}
+                                          {...provided.draggableProps}
+                                          {...provided.dragHandleProps}
+                                          className={`flex items-center justify-between p-3 bg-gray-50 rounded-lg mb-2 ${snapshot.isDragging ? "ring-2 ring-blue-400 shadow-lg" : ""}`}
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            {newFormNames.includes(form.name) && <Badge variant="secondary" className="text-xs">new</Badge>}
+                                            <div>
+                                              <p className="font-medium text-sm">{form.name}</p>
+                                              <p className="text-xs text-gray-500">{form.type}</p>
+                                            </div>
+                                          </div>
+                                          <div className="flex gap-1">
+                                            <Button size="sm" variant="outline">
+                                              <Eye className="w-3 h-3" />
+                                            </Button>
+                                            <Button size="sm" variant="outline">
+                                              <Edit className="w-3 h-3" />
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </Draggable>
+                                  ))}
+                                  {provided.placeholder}
+                                </div>
+                              )}
+                            </Droppable>
+                          </DragDropContext>
+                          {/* 新增其他可填表單按鈕 */}
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="outline" className="w-full mt-3">
+                                <Plus className="w-4 h-4 mr-2" />
+                                新增其他可填表單
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>新增其他可填表單</DialogTitle>
+                              </DialogHeader>
+                              <div className="space-y-3">
+                                {bagFormingFormOptions.map((option, idx) => (
+                                  <div key={idx} className="flex items-center justify-between p-3 bg-gray-100 rounded-lg">
+                                    <div>
+                                      <p className="font-medium text-sm">{option.name}</p>
+                                      <p className="text-xs text-gray-500">{option.type}</p>
+                                    </div>
+                                    <Button size="sm" onClick={() => handleAddForm(option)}>
+                                      選擇
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        </>
+                      ) : (
+                        // 其他部門正常渲染
+                        <>
+                          {(forms as Record<string, any[]>)[dept.id]?.map((form, index) => (
+                            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                              <div>
+                                <p className="font-medium text-sm">{form.name}</p>
+                                <p className="text-xs text-gray-500">{form.type}</p>
+                              </div>
+                              <div className="flex gap-1">
+                                <Button size="sm" variant="outline">
+                                  <Eye className="w-3 h-3" />
+                                </Button>
+                                <Button size="sm" variant="outline">
+                                  <Edit className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -380,17 +472,17 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>各課別處理時間統計</CardTitle>
+                  <CardTitle>部門效率統計</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {departments.slice(1).map((dept) => (
-                      <div key={dept.id}>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span>{dept.name}</span>
-                          <span>平均 2.5 天</span>
+                    {departments.map((dept) => (
+                      <div key={dept.id} className="flex items-center justify-between">
+                        <span className="text-sm">{dept.name}</span>
+                        <div className="flex items-center gap-2">
+                          <Progress value={Math.random() * 100} className="w-20" />
+                          <span className="text-sm text-gray-500">{Math.round(Math.random() * 100)}%</span>
                         </div>
-                        <Progress value={Math.random() * 100} className="h-2" />
                       </div>
                     ))}
                   </div>
@@ -399,27 +491,21 @@ export default function DashboardPage() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>表單完成率</CardTitle>
+                  <CardTitle>品質統計</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-green-600">92%</div>
-                      <p className="text-sm text-gray-500">整體完成率</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">合格率</span>
+                      <Badge variant="default">98.5%</Badge>
                     </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>按時完成</span>
-                        <span className="text-green-600">85%</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>延遲完成</span>
-                        <span className="text-yellow-600">7%</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>未完成</span>
-                        <span className="text-red-600">8%</span>
-                      </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">不良率</span>
+                      <Badge variant="destructive">1.5%</Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">返工率</span>
+                      <Badge variant="secondary">0.8%</Badge>
                     </div>
                   </div>
                 </CardContent>

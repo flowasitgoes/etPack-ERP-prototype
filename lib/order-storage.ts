@@ -91,8 +91,8 @@ export function getOrders(): OrderData[] {
   return [
     {
       id: "K011404140001",
-      customerName: "和宸/KW8010",
-      productName: "阿昌8入染白壹字袋114.5*41.2C",
+              customerName: "XX/KW8010",
+        productName: "XX8入染白壹字袋114.5*41.2C",
       customNumber: "W8010-B02001",
       deliveryDate: "2025-04-29",
       orderQuantity: "12800只/20箱",

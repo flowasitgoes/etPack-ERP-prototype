@@ -255,7 +255,7 @@ export default function OrderPreview({ params }: { params: { orderId: string } }
               {/* Header Section */}
               <div className="border-2 border-black">
                 <div className="text-center py-4 border-b border-black">
-                  <h1 className="text-2xl font-bold">久藝塑膠工業股份有限公司</h1>
+                  <h1 className="text-2xl font-bold">XXYY工業股份有限公司</h1>
                   <h2 className="text-xl font-bold mt-2">訂製單記錄表</h2>
                   <div className="flex justify-between items-center mt-2 px-4">
                     <span>單米重：54.11C(單層)</span>

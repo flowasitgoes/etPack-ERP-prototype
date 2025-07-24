@@ -206,7 +206,7 @@ export default function CustomOrderRecord() {
               {/* Header Section */}
               <div className="border-2 border-black">
                 <div className="text-center py-4 border-b border-black">
-                  <h1 className="text-2xl font-bold">久藝塑膠工業股份有限公司</h1>
+                  <h1 className="text-2xl font-bold">XXYY工業股份有限公司</h1>
                   <h2 className="text-xl font-bold mt-2">訂製單記錄表</h2>
                   <div className="flex justify-between items-center mt-2 px-4">
                     <span>單米重：{formData.formNumber}(單層)</span>
@@ -245,7 +245,7 @@ export default function CustomOrderRecord() {
                             value={formData.customerName}
                             onChange={(e) => handleInputChange("customerName", e.target.value)}
                             className="border-0 bg-transparent"
-                            placeholder="和宸/KW8010"
+                            placeholder="XX/KW8010"
                           />
                         </td>
                         <td className="border border-black p-2 bg-gray-100 font-medium">訂製數量</td>
@@ -265,7 +265,7 @@ export default function CustomOrderRecord() {
                             value={formData.productName}
                             onChange={(e) => handleInputChange("productName", e.target.value)}
                             className="border-0 bg-transparent"
-                            placeholder="阿昌8入染白壹字袋114.5*41.2C"
+                            placeholder="XX8入染白壹字袋114.5*41.2C"
                           />
                         </td>
                         <td className="border border-black p-2 bg-gray-100 font-medium">配方編號</td>

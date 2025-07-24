@@ -42,7 +42,7 @@ export default function ProcessMemoPage() {
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="text-center text-2xl font-bold">製程備忘錄</CardTitle>
-            <p className="text-center text-gray-600 mt-2">選擇表單類型</p>
+            <p className="text-center text-gray-600 mt-2">選擇其他表單類型</p>
           </CardHeader>
         </Card>
 
